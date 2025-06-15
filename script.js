@@ -1,29 +1,8 @@
 let xp = 0;
 let level = 1;
-const XP_PER_TASK = 20; // You can tweak this
+const XP_PER_TASK = 20;
 let XP_TO_LEVEL_UP = 100;
-function startGame() {
-  // Hide the welcome panel
-  document.getElementById("welcome-panel").classList.add("hidden");
-  // Show the main planner UI
-  document.getElementById("main-app").classList.remove("hidden");
-  const welcome = document.getElementById("welcome-panel");
-  const mainApp = document.getElementById("main-app");
-
-  // Hide welcome panel
-  welcome.classList.add("hidden");
-
-  // Prepare main app panel for animation
-  mainApp.classList.remove("hidden");
-  mainApp.classList.add("animate-in");
-
-  // Trigger animation after 50ms
-  setTimeout(() => {
-    mainApp.classList.add("show");
-    mainApp.classList.remove("animate-in");
-  }, 50);
-}
-const tasks = [
+let tasks = [
   {
     task: "Read Chapter 4",
     class: "English",
@@ -53,6 +32,29 @@ const tasks = [
     status: "Incomplete",
   },
 ];
+loadProgress();
+loadTasks();
+function startGame() {
+  // Hide the welcome panel
+  document.getElementById("welcome-panel").classList.add("hidden");
+  // Show the main planner UI
+  document.getElementById("main-app").classList.remove("hidden");
+  const welcome = document.getElementById("welcome-panel");
+  const mainApp = document.getElementById("main-app");
+
+  // Hide welcome panel
+  welcome.classList.add("hidden");
+
+  // Prepare main app panel for animation
+  mainApp.classList.remove("hidden");
+  mainApp.classList.add("animate-in");
+
+  // Trigger animation after 50ms
+  setTimeout(() => {
+    mainApp.classList.add("show");
+    mainApp.classList.remove("animate-in");
+  }, 50);
+}
 
 // Convert priority to numeric value
 function priorityValue(p) {
@@ -113,7 +115,6 @@ function populateQuestTable() {
     prioritySelect.addEventListener("change", (e) => {
       editTask(index, "priority", e.target.value);
       populateQuestTable();
-      initializeDatePickers();
     });
     priorityCell.appendChild(prioritySelect);
     tr.appendChild(priorityCell);
@@ -126,7 +127,6 @@ function populateQuestTable() {
     dueDateInput.addEventListener("change", (e) => {
       editTask(index, "dueDate", e.target.value);
       populateQuestTable();
-      initializeDatePickers();
     });
     dueDateCell.appendChild(dueDateInput);
     tr.appendChild(dueDateCell);
@@ -147,14 +147,12 @@ function populateQuestTable() {
 
       // XP logic
       if (e.target.value === "Complete" && prevStatus !== "Complete") {
-        xp += XP_PER_TASK;
+        gainXP(XP_PER_TASK);
       } else if (e.target.value !== "Complete" && prevStatus === "Complete") {
-        xp = Math.max(0, xp - XP_PER_TASK);
+        gainXP(-XP_PER_TASK);
       }
-
       updateXPBar();
       populateQuestTable();
-      initializeDatePickers();
     });
     statusCell.appendChild(statusSelect);
     tr.appendChild(statusCell);
@@ -175,18 +173,10 @@ function populateQuestTable() {
   saveTasks();
 }
 function deleteTask(index) {
-  /*const task = tasks[index];
-
-  // If the task was completed, subtract XP (but don't go below 0)
-  if (task.status === "Complete") {
-    xp = Math.max(0, xp - XP_PER_TASK);
-  }*/
-
   tasks.splice(index, 1); // Remove the task
   //sortTasks(); // Re-sort remaining tasks
   updateXPBar(); // Update XP bar
   populateQuestTable(); // Re-render table
-  initializeDatePickers();
 }
 // Call this after animation completes
 function startGame() {
@@ -201,14 +191,14 @@ function startGame() {
     mainApp.classList.add("show");
     mainApp.classList.remove("animate-in");
     populateQuestTable();
-    initializeDatePickers();
   }, 50);
   updateXPBar();
+  saveTasks();
 }
 function editTask(index, field, value) {
   tasks[index][field] = value.trim();
 
-  // Optional: re-sort after editing dueDate or priority
+  // re-sort after editing dueDate or priority
   if (field === "dueDate" || field === "priority") {
     tasks.sort((a, b) => {
       const dateA = new Date(a.dueDate);
@@ -220,6 +210,7 @@ function editTask(index, field, value) {
     });
     updateXPBar();
   }
+  saveTasks();
 }
 function editTask(index, field, value) {
   tasks[index][field] = value.trim();
@@ -267,33 +258,27 @@ function toggleComplete(index, isChecked) {
   if (isChecked && !wasComplete) {
     gainXP(XP_PER_TASK);
   } else if (!isChecked && wasComplete) {
-    gainXP(-XP_PER_TASK); // Optional: lose XP when unchecked
+    gainXP(-XP_PER_TASK);
   }
 
   sortTasks();
   populateQuestTable();
-  initializeDatePickers();
 }
-function gainXP(amount) {
-  xp += amount;
-  if (xp >= XP_TO_LEVEL_UP) {
-    xp = xp - XP_TO_LEVEL_UP;
-    level++;
-    levelUp();
-  }
-  updateXPBar();
-}
-function gainXP(amount) {
-  xp += amount;
 
+function gainXP(amount) {
+  xp += amount;
+  if (xp < 0) {
+    xp = 0;
+  }
   while (xp >= XP_TO_LEVEL_UP) {
     xp -= XP_TO_LEVEL_UP;
     level++;
     levelUp();
-    XP_TO_LEVEL_UP += 20; // Increase XP needed per level if you want
+    XP_TO_LEVEL_UP += 20; //makes it harder to level up every time
   }
 
   updateXPBar();
+  saveProgress();
 }
 
 function addNewTask() {
@@ -307,7 +292,6 @@ function addNewTask() {
 
   sortTasks();
   populateQuestTable();
-  initializeDatePickers();
   updateXPBar();
 }
 function sortTasks() {
@@ -329,10 +313,13 @@ function loadTasks() {
   const saved = localStorage.getItem("questTasks");
   if (saved) tasks = JSON.parse(saved);
 }
-function initializeDatePickers() {
-  flatpickr(".datepicker", {
-    dateFormat: "Y-m-d",
-    defaultDate: "today",
-    theme: "dark",
-  });
+function saveProgress() {
+  localStorage.setItem("xp", xp);
+  localStorage.setItem("level", level);
+  localStorage.setItem("xpToLevelUp", XP_TO_LEVEL_UP);
+}
+function loadProgress() {
+  xp = parseInt(localStorage.getItem("xp")) || 0;
+  level = parseInt(localStorage.getItem("level")) || 1;
+  XP_TO_LEVEL_UP = parseInt(localStorage.getItem("xpToLevelUp")) || 100;
 }
